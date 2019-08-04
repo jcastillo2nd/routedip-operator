@@ -1,0 +1,11 @@
+apiVersion: routed-ip-operator.jcastillo2nd.com/v1alpha1
+kind: ClusterRoutedIPIssuer
+metadata:
+  name: example-clusterroutedipissuer
+spec:
+  # Add fields here
+  className: digitalocean.com/floating-ip
+  firewallPostAllow: false
+  nodePortRange: "30000-32767"
+  perNodeIPLimit: 1
+  fromSecretsRef: example-clusterroutedipissuer-secret
