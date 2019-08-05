@@ -3,6 +3,7 @@ kind: ClusterRole
 metadata:
   creationTimestamp: null
   name: routed-ip-operator
+  namespace: routed-ip-operator
 rules:
 - apiGroups:
   - ""
@@ -53,9 +54,10 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - routed-ip-operator.jcastillo2nd.com
+  - routedipoperator.jcastillo2nd.com
   resources:
   - '*'
   - routedips
+  - clusterroutedipissuers
   verbs:
   - '*'

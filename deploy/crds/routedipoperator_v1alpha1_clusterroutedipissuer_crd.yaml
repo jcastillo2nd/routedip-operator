@@ -9,7 +9,7 @@ spec:
     listKind: ClusterRoutedIPIssuerList
     plural: clusterroutedipissuers
     singular: clusterroutedipissuer
-  scope: Namespaced
+  scope: Cluster
   subresources:
     status: {}
   validation:

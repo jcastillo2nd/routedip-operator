@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: routed-ip-operator
+  namespace: routed-ip-operator
 spec:
   replicas: 1
   selector:
@@ -9,6 +10,7 @@ spec:
       name: routed-ip-operator
   template:
     metadata:
+      namespace: routed-ip-operator
       labels:
         name: routed-ip-operator
     spec:

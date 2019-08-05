@@ -1,4 +1,4 @@
-apiVersion: routed-ip-operator.jcastillo2nd.com/v1alpha1
+apiVersion: routedipoperator.jcastillo2nd.com/v1alpha1
 kind: ClusterRoutedIPIssuer
 metadata:
   name: example-clusterroutedipissuer
@@ -9,3 +9,21 @@ spec:
   nodePortRange: "30000-32767"
   perNodeIPLimit: 1
   fromSecretsRef: example-clusterroutedipissuer-secret
+  updateRoutedIPSpec:
+    template:
+        spec:
+          containers:
+          - name: pi
+            image: perl
+            command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+          restartPolicy: Never
+    backoffLimit: 4
+  updateFirewallSpec:
+    template:
+        spec:
+          containers:
+          - name: pi
+            image: perl
+            command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+          restartPolicy: Never
+    backoffLimit: 4
