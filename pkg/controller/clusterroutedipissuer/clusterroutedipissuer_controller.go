@@ -2,15 +2,13 @@ package clusterroutedipissuer
 
 import (
 	"context"
-	"errors"
 
 	routedipoperatorv1alpha1 "github.com/jcastillo2nd/routed-ip-operator/pkg/apis/routedipoperator/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	batchv1 "k8s.io/api/batch/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -21,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller_clusterroutedipissuer")
+var log = logf.Log.WithName("routedipoperator").WithName("controller_clusterroutedipissuer")
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -58,7 +56,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Jobs and requeue the owner ClusterRoutedIPIssuer
-	err = c.Watch(&source.Kind{Type: &batch.Job{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &routedipoperatorv1alpha1.ClusterRoutedIPIssuer{},
 	})
@@ -88,8 +86,8 @@ type ReconcileClusterRoutedIPIssuer struct {
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileClusterRoutedIPIssuer) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling ClusterRoutedIPIssuer")
+	rlog := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	rlog.Info("Reconciling ClusterRoutedIPIssuer")
 
 	// Fetch the ClusterRoutedIPIssuer instance
 	instance := &routedipoperatorv1alpha1.ClusterRoutedIPIssuer{}
@@ -102,6 +100,7 @@ func (r *ReconcileClusterRoutedIPIssuer) Reconcile(request reconcile.Request) (r
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		rlog.Error(err, "Unable to Get request object.")
 		return reconcile.Result{}, err
 	}
 
@@ -109,8 +108,10 @@ func (r *ReconcileClusterRoutedIPIssuer) Reconcile(request reconcile.Request) (r
 	updateIPJob := newUpdateClusterIPJob(instance)
 	// Set ClusterRoutedIPIssuer instance as the owner and controller
 	if err := controllerutil.SetControllerReference(instance, updateIPJob, r.scheme); err != nil {
+		rlog.Error(err, "Unable to set job controller reference.", "job", updateIPJob)
 		return reconcile.Result{}, err
 	}
+	rlog.Info("Created IP update job.", "job", updateIPJob)
 
 	result := reconcile.Result{}
 
@@ -120,90 +121,107 @@ func (r *ReconcileClusterRoutedIPIssuer) Reconcile(request reconcile.Request) (r
 	if err != nil {
 		return result, err
 	}
+	rlog.Info("IP update job succeeded.", "job", updateIPJob)
 
 	// The UpdateIPJob has succeeded, now we need to update the firewall
 	// Define a new Job from updateFirewallSpec
 	updateFirewallJob := newUpdateFirewallJob(instance)
 	// Set ClusterRoutedIPIssuer instance as the owner and controller
 	if err := controllerutil.SetControllerReference(instance, updateFirewallJob, r.scheme); err != nil {
+		rlog.Error(err, "Unable to set job controller reference.", "job", updateFirewallJob)
 		return reconcile.Result{}, err
 	}
+	rlog.Info("Created Firewall update job.", "job", updateFirewallJob)
 
 	result, err = retryJobUntilSuccess(r, updateIPJob)
 
 	if err != nil {
 		return reconcile.Result{}, nil
 	}
+	rlog.Info("Firewall update job succeeded.", "job", updateFirewallJob)
 
 	// Both updateIPJob and updateFirewallJob have succeeded
-	_ = r.Client.Delete(context.Background(), updateIPJob)
-	_ = r.Client.Delete(context.Background(), updateFirewallJob)
+	err = r.client.Delete(context.Background(), updateFirewallJob)
+
+	if err != nil {
+		rlog.Error(err, "Unable to clean up firewall update job.", "job", updateFirewallJob)
+		return reconcile.Result{}, err
+	}
+
+	err = r.client.Delete(context.Background(), updateIPJob)
+
+	if err != nil {
+		rlog.Error(err, "Unable to clean up IP update job.", "job", updateIPJob)
+		return reconcile.Result{}, err
+	}
+	rlog.Info("Cleaned up jobs.")
 	return reconcile.Result{}, nil
 }
 
 // newUpdateClusterIPJob returns a Job with the JobSpec designated for the ClusterRoutedIPIssuer
-func newUpdateClusterIPJob(cr *routedipoperatorv1alpha1.ClusterRoutedIPIssuer.ClusterRoutedIPIssuer) *batch.Job {
+func newUpdateClusterIPJob(cr *routedipoperatorv1alpha1.ClusterRoutedIPIssuer) *batchv1.Job {
 	labels := map[string]string{
-		"app":     cr.Name,
+		"app":    cr.Name,
 		"update": "RoutedIP",
 	}
-	job := &batch.Job {
+	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name + "-ip-job",
 			Namespace: cr.Namespace,
 			Labels:    labels,
 		},
-		Spec: cr.UpdateRoutedIPSpec,
-	}
-	if err := controllerutil.SetControllerReference(instance, job, r.scheme); err != nil {
-		return reconcile.Result{}, err
+		Spec: cr.Spec.UpdateRoutedIPSpec,
 	}
 }
 
 // newUpdateFirewallJob returns a Job with the JobSpec designated for the ClusterRoutedIPIssuer
-func newUpdateFirewallJob(cr *routedipoperatorv1alpha1.ClusterRoutedIPIssuer.ClusterRoutedIPIssuer) *batch.Job {
+func newUpdateFirewallJob(cr *routedipoperatorv1alpha1.ClusterRoutedIPIssuer) *batchv1.Job {
 	labels := map[string]string{
-		"app":     cr.Name,
+		"app":    cr.Name,
 		"update": "firewall",
 	}
-	return &batch.Job{
+	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name + "-fw-job",
 			Namespace: cr.Namespace,
 			Labels:    labels,
 		},
-		Spec: cr.UpdateFirewallSpec,
+		Spec: cr.Spec.UpdateFirewallSpec,
 	}
 }
 
 // retryJobUntilSuccees continually returns non-nil err until Job completion
-func retryJobUntilSuccess(r *ReconcileClusterRoutedIPIssuer, j *batch.Job) reconcile.Result, error {
+func retryJobUntilSuccess(r *ReconcileClusterRoutedIPIssuer, j *batchv1.Job) (reconcile.Result, error) {
 	// Check if this Job already exists
-	found := &batch.Job{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: j.Name, Namespace: j.Namespace}, found)
+	found := &batchv1.Job{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: j.Name, Namespace: j.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Job", "Job.Namespace", j.Namespace, "Job.Name", j.Name)
+		log.Info("Job not found, creating.", "job", j)
 		err = r.client.Create(context.TODO(), j)
 		if err != nil {
+			log.Error(err, "Failed creating.", "job", j)
 			return reconcile.Result{}, err
 		}
 
 		// Job created successfully - don't requeue
 		return reconcile.Result{}, nil
 	} else if err != nil {
+		log.Error(err, "Failed to get job.", "job", j)
 		return reconcile.Result{}, err
 	}
 
 	// Job already exists - Check if we need to retry, or run through FirewallUpdate
-	retry bool := false
-        for i := 0; i < len(found.Status.Conditions); i++{
-		if found.Status.Conditions[i].Status == corev1.ConditionStatus.ConditionTrue{
-			if found.Status.Conditions[i].Type == batch.JobConditionType.JobFailed{
+	retry := false
+	for i := 0; i < len(found.Status.Conditions); i++ {
+		if found.Status.Conditions[i].Status == "True" {
+			if found.Status.Conditions[i].Type == batchv1.JobFailed {
+				log.Info("Job failed, retrying.", "job", found)
 				retry = true
 				break
 			}
-			if found.Status.Conditions[i].Type == batch.JobConditionType.JobComplete{
-				if foundUpdateIPJob.Status.Succeeded > 0{
+			if found.Status.Conditions[i].Type == batchv1.JobComplete {
+				if found.Status.Succeeded > 0 {
+					log.Info("Job succeeded.", "job", found)
 					break
 				}
 			}
@@ -212,14 +230,15 @@ func retryJobUntilSuccess(r *ReconcileClusterRoutedIPIssuer, j *batch.Job) recon
 
 	if retry {
 		// We need to Retry, Delete current Job, and requeue
-		reqLogger.Warn("Job failed, retrying.", "Job.Namespace", found.Namespace, "Job.Name", found.Name)
-		err = r.client.Delete(context.TODO(), foundUpdateIPJob)
+		err = r.client.Delete(context.TODO(), found)
 		if err != nil {
 			// Return client Delete error
+			log.Error(err, "Failed to delete failed job.", "job", found)
 			return reconcile.Result{}, err
 		}
-		err := errors.New("Job failed, retrying.")
+		err := errors.NewBadRequest("Retrying job.")
 		// Return Job Failed, retrying error
 		return reconcile.Result{}, err
-        }
+	}
+	return reconcile.Result{}, nil
 }

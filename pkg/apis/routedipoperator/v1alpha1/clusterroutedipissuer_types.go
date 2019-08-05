@@ -2,8 +2,8 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch"
 	amt "k8s.io/apimachinery/pkg/types"
+	batchv1 "k8s.io/api/batch/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -11,17 +11,19 @@ import (
 
 // ClusterRoutedIPIssuerSpec defines the desired state of ClusterRoutedIPIssuer
 // +k8s:openapi-gen=true
+// Will still need to patch CRD to Cluster. See: https://github.com/kubernetes/kubernetes/pull/80458
+// +genclient:nonNamespaced
 type ClusterRoutedIPIssuerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	ClassName string `json:"className"`
-	FirewallPostAllow bool `json:"firewallPostAllow"`
-	NodePortRange string `json:"nodePortRange"`
-	PerNodeIPLimit int32 `json:"perNodeIPLimit"`
-	FromSecretsRef string `json:"fromSecretsRef"`
-	UpdateRoutedIPSpec batch.JobSpec `json:"updateRoutedIPSpec"`
-        UpdateFirewallSpec batch.JobSpec `json:"updateFirewallSpec"`
+	ClassName          string        `json:"className"`
+	FirewallPostAllow  bool          `json:"firewallPostAllow"`
+	NodePortRange      string        `json:"nodePortRange"`
+	PerNodeIPLimit     int32         `json:"perNodeIPLimit"`
+	FromSecretsRef     string        `json:"fromSecretsRef"`
+	UpdateRoutedIPSpec batchv1.JobSpec `json:"updateRoutedIPSpec"`
+	UpdateFirewallSpec batchv1.JobSpec `json:"updateFirewallSpec"`
 }
 
 // ClusterRoutedIPIssuerStatus defines the observed state of ClusterRoutedIPIssuer

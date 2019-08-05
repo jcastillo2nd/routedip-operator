@@ -8,6 +8,9 @@ spec:
     kind: ClusterRoutedIPIssuer
     listKind: ClusterRoutedIPIssuerList
     plural: clusterroutedipissuers
+    shortNames:
+    - cripi
+    - cripis
     singular: clusterroutedipissuer
   scope: Cluster
   subresources:
