@@ -14,9 +14,9 @@ type RoutedIPSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	// +kubebuilder:validation:Enum=digitalocean,aws,gce
+	// +kubebuilder:validation:Enum={digitalocean,aws,gce}
 	IssuerClass string `json:"issuerClass"`
-	// +kubebuilder:validation:Pattern=\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}
+	// +kubebuilder:validation:Pattern=`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`
 	RoutedIP   string             `json:"routedIP,omitempty"`
 	ServiceRef amt.NamespacedName `json:"serviceRef"`
 }

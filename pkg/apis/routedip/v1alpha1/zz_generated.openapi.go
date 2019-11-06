@@ -67,8 +67,31 @@ func schema_pkg_apis_routedip_v1alpha1_RoutedIPSpec(ref common.ReferenceCallback
 			SchemaProps: spec.SchemaProps{
 				Description: "RoutedIPSpec defines the desired state of RoutedIP",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"issuerClass": {
+						SchemaProps: spec.SchemaProps{
+							Description: "INSERT ADDITIONAL SPEC FIELDS - desired state of cluster Important: Run \"operator-sdk generate k8s\" to regenerate code after modifying this file Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"routedIP": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"serviceRef": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/types.NamespacedName"),
+						},
+					},
+				},
+				Required: []string{"issuerClass", "serviceRef"},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/types.NamespacedName"},
 	}
 }
 
@@ -78,7 +101,36 @@ func schema_pkg_apis_routedip_v1alpha1_RoutedIPStatus(ref common.ReferenceCallba
 			SchemaProps: spec.SchemaProps{
 				Description: "RoutedIPStatus defines the observed state of RoutedIP",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"routedIP": {
+						SchemaProps: spec.SchemaProps{
+							Description: "INSERT ADDITIONAL STATUS FIELD - define observed state of cluster Important: Run \"operator-sdk generate k8s\" to regenerate code after modifying this file Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"node": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"firewall": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"ports": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("./pkg/apis/routedip/v1alpha1.PortList"),
+						},
+					},
+				},
+				Required: []string{"routedIP", "node", "ports"},
 			},
 		},
+		Dependencies: []string{
+			"./pkg/apis/routedip/v1alpha1.PortList"},
 	}
 }
