@@ -1,0 +1,7 @@
+apiVersion: routedip.jcastillo2nd.info/v1alpha1
+kind: RoutedIP
+metadata:
+  name: example-routedip
+spec:
+  # Add fields here
+  size: 3
