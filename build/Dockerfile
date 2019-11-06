@@ -1,11 +1,11 @@
-FROM registry.access.redhat.com/ubi7/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
 
-ENV OPERATOR=/usr/local/bin/routed-ip-operator \
+ENV OPERATOR=/usr/local/bin/routedip-operator \
     USER_UID=1001 \
-    USER_NAME=routed-ip-operator
+    USER_NAME=routedip-operator
 
 # install operator binary
-COPY build/_output/bin/routed-ip-operator ${OPERATOR}
+COPY build/_output/bin/routedip-operator ${OPERATOR}
 
 COPY build/bin /usr/local/bin
 RUN  /usr/local/bin/user_setup

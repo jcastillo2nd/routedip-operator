@@ -1,33 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: routed-ip-operator
-  namespace: routed-ip-operator
+  name: routedip-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: routed-ip-operator
+      name: routedip-operator
   template:
     metadata:
-      namespace: routed-ip-operator
       labels:
-        name: routed-ip-operator
+        name: routedip-operator
     spec:
-      serviceAccountName: routed-ip-operator
+      serviceAccountName: routedip-operator
       containers:
-        - name: routed-ip-operator
+        - name: routedip-operator
           # Replace this with the built image name
-          image: jcastillo2nd/routed-ip-operator
+          image: REPLACE_IMAGE
           command:
-          - routed-ip-operator
+          - routedip-operator
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
-              value: ""
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
-              value: "routed-ip-operator"
+              value: "routedip-operator"

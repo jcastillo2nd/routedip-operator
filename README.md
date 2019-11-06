@@ -1,63 +1,56 @@
 # RoutedIP Operator #
 
-This is a Kubernetes operator designed to operate the RoutedIP address feature on a platform. Using the RoutedIP CRD, it can create, delete, assign and unassign routed IPs across nodes in a cluster. The use case is meant for Ingress controllers implemented using a ClusterIP service with a selector for Pods. This is meant for the NodePort option of the service or ContainerPort.hostPort ports with a custom Cloud Firewall to allow the Ports on DigitalOcean class for Floating IPs.
+This is a Kubernetes operator designed to operate the RoutedIP address feature on a platform. Using the RoutedIP CRD, it can create, delete, assign and unassign routed IPs across nodes in a cluster. The use case is meant for Ingress controllers implemented using a ClusterIP service with a selector for Pods in concert with a Platform that supports routable IP addresses like the DigitalOcean Floating IP feature.
 
-## Planning ##
+## RoutedIP CRD ##
 
-Current considerations:
+The RoutedIP resource is the IP address that will be assigned across nodes. This can be created through a RoutedIPIssuer, or can be recovered by defining the address in the RoutedIP spec.
 
-RoutedIP controller secondary watch is Service to factor out Node Drain/Upgrade, Endpoint changes et al
-ClusterRoutedIP class used to customize deployment 
+## RoutedIPIssuer CRD ##
 
-* Operation considerations
-    - On `ClusterRoutedIPClass` reconcile
-        * On ClusterRoutedIPClass change
-            - controllerutil.CreateOrUpdate with spec
-            - ? Might need to catch in-process Job cases with DeepEqual changes
-        * On JobSpec change // I don't think this needs to be watched, 
-            - How to determine whether this is the updateRoutedIP or updateFirewall JobSpec?
-            - controllerutil.CreateOrUpdate ClusterRoutedIPClass with JobSpec
-        * On Job change
-            - On updateRoutedIP success complete
-                * clean up Job
-                * ensure Firewall
-                    - create updateFirewall Job
-            - On failed complete
-                * generate Event from Job failure
-                * clean up Job
-                * create new Job
-    - On `RoutedIP` reconcile
-        * On RoutedIP change
-            - controllerutil.CreateOrUpdate with spec
-        * On Service change
-            - Check if match RoutedIPList serviceRef
-            - ensure RoutedIP
-                * get ClusterRoutedIPClass instance by className
-                * create Job for updateRoutedIP owned by ClusterRoutedIPClass
-    - Ensure RoutedIP ( with RoutedIP resource )
-            * Build prospective Node list by RoutedIP.serviceRef
-            * Check eligibility for Prospective Nodes
-            * On multiple nodes eligible, elect youngest Node
-            * Add taint on elected Node
-            * If not `firewallPostAllow`, add Node to port on Firewall
-            * Assign RoutedIP to elected Node
-            * Remove taint from current Node
-    - Ensure firewall
-        * Build map of ServicePort.port/containerPort.hostPort with Nodes for ports outside NodePort range from RoutedIPs
-        * Resolve nodes to Droplet IDs
-        * Set ports with Droplet IDs on Firewall
+The RoutedIPIssuer resource defines the API functionality for managing a RoutedIP. A RoutedIPIssuer is required in order for a RoutedIP to operate.
 
-* CRD `ClusterRoutedIPClass` Cluster scope
-    - Can store `className` for RoutedIP implementation
-    - Can store `firewallPostAllow` to patch firewalls only after assignment Default: false
-    - Can store `nodePortRange` string for configured Node port range, since it's not discoverable via API Default: 30000-32767
-    - Can store `perNodeIPLimit` for the configured Node <-> routed IP limit Default : 1
-    - Can store `fromSecretsRef` Secret references for implementations values
-    - Can store `updateRoutedIP` Job spec for RoutedIP implementation
-    - Can store `updateFirewall` Job spec for Firewall implementation
+## Implementation Details ##
 
-* CRD `RoutedIP` Namespaced
-    - Can store `className` RoutedIPClass that will handle the request
-    - Can store `routedIP` assignable IP address
-    - Can store `serviceRef` ( serviceName, namespace )
-    - Can store status `assignedNode` to reference the Node that currently holds the IP
+A RoutedIPIssuer client supports
+
+- Finding a RoutedIP address ( FindRoutedIP )
+
+- Creating a RoutedIP address ( CreateRoutedIP )
+
+- Deleting a RoutedIP address ( DeleteRoutedIP <- routedIPReclaimPolicy {*'Retain'*, 'Delete'})
+
+- Electing an eligible Node for RoutedIP assignment ( ElectRoutedIPNode )
+
+- Assigning a RoutedIP to a Node ( AssignRoutedIP )
+
+- Updating a firewall for RoutedIP operation ( RoutedIPFirewallUpdate <- routedIPFirewallName )
+
+  - Finding a Firewall configuration ( FindRoutedIPFirewall )
+
+  - Finding ports used in RoutedIP service ( FindRoutedIPPorts )
+
+  - Updating Firewall port configuration ( UpdateRoutedIPFirewallPorts )
+
+    - Adding a Firewall Port Rule ( AddRoutedIPFirewallPort )
+
+    - Removing a Firewall Port Rule ( DeleteRoutedIPFirewallPort )
+
+  - Updating a Firewall node configuration ( UpdateRoutedIPFirewallNode )
+
+    - Adding a Node Firewall rule ( AddRoutedIPFirewallNode )
+
+    - Removing a Node from a firewall ( DeleteRoutedIPFirewallNode )
+
+The order for the update should occur in a manner to maximize service availability
+
+ElectRoutedIPNode - Pick a node that will now hold the RoutedIP
+FindRoutedIPFirewall - Ensure we have a Firewall to work on, if at all
+FindRoutedIPPorts - Ensure we have a list of the required ports
+AddRoutedIPFirewallPort - Ensure Port is added to Firewall
+AddRoutedIPFirewallNode - Ensure Node is added to Firewall
+AssignRoutedIP - Ensure RoutedIP is moving traffic to elected Node
+DeleteRoutedIPFirewallPort - Ensure extraneous Ports are removed from Firewall
+DeleteRoutedIPFirewallNode - Ensure extraneous Nodes are removed from Firewall
+
+
