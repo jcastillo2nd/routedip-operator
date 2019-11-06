@@ -27,10 +27,15 @@ type RoutedIPStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	RoutedIP string  `json:"routedIP"`
-	Node     string  `json:"node"`
-	Firewall string  `json:"firewall,omitempty"`
-	Ports    []int32 `json:"ports"`
+	RoutedIP string       `json:"routedIP"`
+	Node     amt.NodeName `json:"node"`
+	Firewall string       `json:"firewall,omitempty"`
+	Ports    PortList     `json:"ports"`
+}
+
+// PortList is a list of ports
+type PortList struct {
+	Ports []int32
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
